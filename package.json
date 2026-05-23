@@ -1,0 +1,20 @@
+{
+  "name": "pi-prompt-suggestions",
+  "version": "0.1.0",
+  "description": "Pi extension that suggests a natural next prompt after an agent response.",
+  "type": "module",
+  "private": false,
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.75.5",
+    "@earendil-works/pi-ai": "^0.75.5",
+    "@earendil-works/pi-tui": "^0.75.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
