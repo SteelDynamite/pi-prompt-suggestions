@@ -222,8 +222,8 @@ Inputs:
 - Current model: `ctx.model`
 - API key/headers from `ctx.modelRegistry.getApiKeyAndHeaders(ctx.model)`
 - Short context derived from recent `event.messages`
-- Small max token limit, e.g. 20-40
-- Low temperature, e.g. 0 or 0.2
+- Small bounded max token limit; current implementation uses 256 so reasoning models have room to emit visible text
+- Do not pass `temperature`; some Pi providers/models reject it
 
 Open decision:
 
@@ -288,8 +288,7 @@ const config = {
   acceptKey: "right",
   placement: "belowEditor",
   maxChars: 80,
-  maxTokens: 32,
-  temperature: 0.2,
+  maxTokens: 256,
   model: undefined,
 };
 ```
