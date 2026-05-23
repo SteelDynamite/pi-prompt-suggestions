@@ -1,17 +1,30 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
 	CustomEditor,
 	convertToLlm,
+	getAgentDir,
 	type AgentEndEvent,
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { completeSimple, type AssistantMessage, type Message } from "@earendil-works/pi-ai";
+import { completeSimple, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
 import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 
 const WIDGET_KEY = "next-prompt-suggestion";
-const MAX_CHARS = 80;
+const DEFAULT_MAX_CHARS = 80;
+const DEFAULT_MAX_TOKENS = 256;
+const GLOBAL_CONFIG_RELATIVE_PATH = ["extensions", "prompt-suggestions.json"];
+const PROJECT_CONFIG_RELATIVE_PATH = [".pi", "prompt-suggestions.json"];
+
+interface PromptSuggestionsConfig {
+	enabled: boolean;
+	maxChars: number;
+	maxTokens: number;
+	model?: string;
+}
+
+type PromptSuggestionsConfigInput = Partial<PromptSuggestionsConfig>;
 
 let suggestion: string | undefined;
 let generationId = 0;
@@ -19,11 +32,13 @@ let lastCtx: ExtensionContext | undefined;
 
 const SUGGESTION_SYSTEM_PROMPT = `[SUGGESTION MODE: Suggest what the user might naturally type next into pi.]
 
-Look at the user's recent messages and the assistant's latest response.
+First, look at the user's recent messages, original request, and the assistant's latest response.
 Predict what the user would naturally type next, not what you think they should do.
 
+The test: would the user think "I was just about to type that"?
+
 Good suggestions:
-- are 2-8 words
+- are 2-12 words
 - match the user's style
 - are specific
 - continue an obvious workflow
@@ -44,6 +59,7 @@ Never suggest:
 - Claude/pi voice like "let me" or "I'll"
 - new ideas the user did not ask about
 - multiple sentences
+- unsafe or sensitive actions, including security incidents, credentials, harm, or private data
 
 If the user explicitly said what they will ask next, suggest that exact next request.
 If a file was created/edited and tests/checks were not run, the next step is clear: suggest running the relevant test/check.
@@ -106,22 +122,26 @@ export default function promptSuggestions(pi: ExtensionAPI) {
 		lastCtx = ctx;
 		clearSuggestion(ctx);
 
+		const config = loadConfig(ctx.cwd, (message) => debug(ctx, message));
+		if (!config.enabled) return debug(ctx, "skipped: disabled by config");
 		if (!ctx.hasUI) return;
 		if (ctx.hasPendingMessages()) return debug(ctx, "skipped: pending messages");
 		if (ctx.ui.getEditorText().trim().length > 0) return debug(ctx, "skipped: editor is not empty");
-		if (!ctx.model) return debug(ctx, "skipped: no model selected");
+
+		const model = resolveSuggestionModel(ctx, config.model);
+		if (!model) return debug(ctx, "skipped: no model selected");
 
 		const id = ++generationId;
 		debug(ctx, "generating...");
 
 		try {
-			const text = await generateSuggestion(event.messages, ctx);
+			const text = await generateSuggestion(event.messages, ctx, model, config);
 			debug(ctx, `raw: ${JSON.stringify(truncatePlain(text, 160))}`);
 			if (id !== generationId) return debug(ctx, "ignored: stale result");
 			if (ctx.hasPendingMessages()) return debug(ctx, "ignored: pending messages appeared");
 			if (ctx.ui.getEditorText().trim().length > 0) return debug(ctx, "ignored: editor became non-empty");
 
-			const clean = sanitizeSuggestion(text);
+			const clean = sanitizeSuggestion(text, config.maxChars);
 			if (!clean) return debug(ctx, `rejected: ${JSON.stringify(truncatePlain(text, 160))}`);
 
 			showSuggestion(clean, ctx);
@@ -157,10 +177,13 @@ function renderSuggestion(ctx = lastCtx): void {
 	);
 }
 
-async function generateSuggestion(messages: AgentEndEvent["messages"], ctx: ExtensionContext): Promise<string> {
-	if (!ctx.model) return "";
-
-	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model);
+async function generateSuggestion(
+	messages: AgentEndEvent["messages"],
+	ctx: ExtensionContext,
+	model: Model<any>,
+	config: PromptSuggestionsConfig,
+): Promise<string> {
+	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 	if (!auth.ok) {
 		debug(ctx, `auth unavailable: ${"error" in auth ? auth.error : "unknown error"}`);
 		return "";
@@ -172,12 +195,12 @@ async function generateSuggestion(messages: AgentEndEvent["messages"], ctx: Exte
 	const options = {
 		apiKey: auth.apiKey,
 		headers: auth.headers,
-		maxTokens: 256,
-		reasoning: ctx.model.reasoning ? ("minimal" as const) : undefined,
+		maxTokens: config.maxTokens,
+		reasoning: model.reasoning ? ("minimal" as const) : undefined,
 	};
 
 	const response = await completeSimple(
-		ctx.model,
+		model,
 		{
 			systemPrompt: SUGGESTION_SYSTEM_PROMPT,
 			messages: [
@@ -247,7 +270,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
-function sanitizeSuggestion(text: string): string | undefined {
+function sanitizeSuggestion(text: string, maxChars = DEFAULT_MAX_CHARS): string | undefined {
 	let clean = text.trim();
 	if (!clean) return undefined;
 	if (clean.includes("\n")) return undefined;
@@ -257,7 +280,7 @@ function sanitizeSuggestion(text: string): string | undefined {
 	clean = clean.replace(/\.$/, "").trim();
 
 	if (!clean) return undefined;
-	if (clean.length > MAX_CHARS) return undefined;
+	if (clean.length > maxChars) return undefined;
 	if (clean.endsWith("?")) return undefined;
 	if (/[.!?].+\S/.test(clean)) return undefined;
 
@@ -282,6 +305,89 @@ function truncatePlain(text: string, max: number): string {
 	return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
+function loadConfig(cwd: string, onWarning?: (message: string) => void): PromptSuggestionsConfig {
+	const globalPath = join(getAgentDir(), ...GLOBAL_CONFIG_RELATIVE_PATH);
+	const projectPath = join(cwd, ...PROJECT_CONFIG_RELATIVE_PATH);
+	return mergeConfigInputs(
+		readConfigFile(globalPath, onWarning),
+		readConfigFile(projectPath, onWarning),
+	);
+}
+
+function readConfigFile(path: string, onWarning?: (message: string) => void): PromptSuggestionsConfigInput {
+	if (!existsSync(path)) return {};
+	try {
+		return parseConfigInput(JSON.parse(readFileSync(path, "utf-8")), path, onWarning);
+	} catch (error) {
+		onWarning?.(`config ignored: ${path}: ${error instanceof Error ? error.message : String(error)}`);
+		return {};
+	}
+}
+
+function parseConfigInput(
+	value: unknown,
+	path = "config",
+	onWarning?: (message: string) => void,
+): PromptSuggestionsConfigInput {
+	if (!isRecord(value)) {
+		onWarning?.(`config ignored: ${path}: expected object`);
+		return {};
+	}
+
+	const config: PromptSuggestionsConfigInput = {};
+	if ("enabled" in value) {
+		if (typeof value.enabled === "boolean") config.enabled = value.enabled;
+		else onWarning?.(`config ignored: ${path}: enabled must be boolean`);
+	}
+	if ("model" in value) {
+		if (typeof value.model === "string" && value.model.trim()) config.model = value.model.trim();
+		else onWarning?.(`config ignored: ${path}: model must be non-empty string`);
+	}
+	if ("maxChars" in value) {
+		if (isPositiveInteger(value.maxChars)) config.maxChars = value.maxChars;
+		else onWarning?.(`config ignored: ${path}: maxChars must be positive integer`);
+	}
+	if ("maxTokens" in value) {
+		if (isPositiveInteger(value.maxTokens)) config.maxTokens = value.maxTokens;
+		else onWarning?.(`config ignored: ${path}: maxTokens must be positive integer`);
+	}
+	return config;
+}
+
+function mergeConfigInputs(...configs: PromptSuggestionsConfigInput[]): PromptSuggestionsConfig {
+	return {
+		enabled: true,
+		maxChars: DEFAULT_MAX_CHARS,
+		maxTokens: DEFAULT_MAX_TOKENS,
+		...Object.assign({}, ...configs),
+	};
+}
+
+function resolveSuggestionModel(ctx: ExtensionContext, configuredModel: string | undefined): Model<any> | undefined {
+	if (!configuredModel) return ctx.model;
+	const parsed = parseModelSpec(configuredModel);
+	if (!parsed) {
+		debug(ctx, `configured model ignored: expected provider/model, got ${configuredModel}`);
+		return ctx.model;
+	}
+	const model = ctx.modelRegistry.find(parsed.provider, parsed.model);
+	if (!model) {
+		debug(ctx, `configured model not found: ${configuredModel}`);
+		return ctx.model;
+	}
+	return model;
+}
+
+function parseModelSpec(spec: string): { provider: string; model: string } | undefined {
+	const slash = spec.indexOf("/");
+	if (slash <= 0 || slash === spec.length - 1) return undefined;
+	return { provider: spec.slice(0, slash), model: spec.slice(slash + 1) };
+}
+
+function isPositiveInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
 function debug(ctx: ExtensionContext, message: string): void {
 	if (process.env.PI_PROMPT_SUGGESTIONS_DEBUG !== "1") return;
 	ctx.ui.setStatus("next-suggestion", `suggestion: ${message}`);
@@ -299,6 +405,9 @@ export const __test__ = {
 	extractMessageText,
 	formatMessageForSuggestion,
 	getMessageRole,
+	mergeConfigInputs,
+	parseConfigInput,
+	parseModelSpec,
 	sanitizeSuggestion,
 	truncatePlain,
 };

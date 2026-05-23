@@ -187,11 +187,13 @@ Use a strict prompt modeled after Claude Code's observed behavior:
 ```text
 [SUGGESTION MODE: Suggest what the user might naturally type next into pi.]
 
-Look at the user's recent messages and the assistant's latest response.
+First, look at the user's recent messages, original request, and the assistant's latest response.
 Predict what the user would naturally type next, not what you think they should do.
 
+The test: would the user think "I was just about to type that"?
+
 Good suggestions:
-- are 2-8 words
+- are 2-12 words
 - match the user's style
 - are specific
 - continue an obvious workflow
@@ -208,8 +210,11 @@ Never suggest:
 - Claude/pi voice like "let me" or "I'll"
 - new ideas the user did not ask about
 - multiple sentences
+- unsafe or sensitive actions, including security incidents, credentials, harm, or private data
 
-If the next step is unclear, reply with nothing.
+If the user explicitly said what they will ask next, suggest that exact next request.
+If a file was created/edited and tests/checks were not run, the next step is clear: suggest running the relevant test/check.
+Only reply with nothing when there is genuinely no plausible next user prompt.
 Reply with only the suggestion text.
 ```
 
@@ -278,9 +283,7 @@ If suggestion generation fails:
 
 ### 11. Configuration
 
-Initial version can hardcode defaults.
-
-Possible future options:
+Supported options:
 
 ```ts
 const config = {
@@ -293,10 +296,27 @@ const config = {
 };
 ```
 
-Expose later via:
+The current implementation loads extension-specific config from:
 
-- extension flags
-- settings file
+```text
+~/.pi/agent/extensions/prompt-suggestions.json
+.pi/prompt-suggestions.json
+```
+
+Project config overrides global config:
+
+```json
+{
+  "enabled": true,
+  "model": "openai/gpt-5-mini",
+  "maxTokens": 256,
+  "maxChars": 80
+}
+```
+
+Possible future additions:
+
+- extension flags for one-off overrides
 - `/next-suggestion on|off`
 
 ## Risks

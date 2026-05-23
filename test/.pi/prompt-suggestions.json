@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "maxTokens": 256,
+  "maxChars": 80
+}

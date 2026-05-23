@@ -9,6 +9,14 @@ pi
 
 Pi auto-discovers `.pi/extensions/next-prompt-suggestion.ts` and enables debug notifications for model-generated suggestions.
 
+This test project also includes `.pi/prompt-suggestions.json`. Add a `model` field there to test a dedicated suggestion model:
+
+```json
+{
+  "model": "openai/gpt-5-mini"
+}
+```
+
 Expected behavior on startup:
 
 1. A dim suggestion appears below the editor: `→ run the tests`.
