@@ -16,6 +16,7 @@ const DEFAULT_MAX_CHARS = 80;
 const DEFAULT_MAX_TOKENS = 256;
 const GLOBAL_CONFIG_RELATIVE_PATH = ["extensions", "prompt-suggestions.json"];
 const PROJECT_CONFIG_RELATIVE_PATH = [".pi", "prompt-suggestions.json"];
+const PROMPT_RELATIVE_PATH = ["prompts", "suggestion-system-prompt.md"];
 
 interface PromptSuggestionsConfig {
 	enabled: boolean;
@@ -29,42 +30,6 @@ type PromptSuggestionsConfigInput = Partial<PromptSuggestionsConfig>;
 let suggestion: string | undefined;
 let generationId = 0;
 let lastCtx: ExtensionContext | undefined;
-
-const SUGGESTION_SYSTEM_PROMPT = `[SUGGESTION MODE: Suggest what the user might naturally type next into pi.]
-
-First, look at the user's recent messages, original request, and the assistant's latest response.
-Predict what the user would naturally type next, not what you think they should do.
-
-The test: would the user think "I was just about to type that"?
-
-Good suggestions:
-- are 2-12 words
-- match the user's style
-- are specific
-- continue an obvious workflow
-- are imperative user prompts like "run the tests" or "commit this"
-- follow an explicit user-stated next request
-
-Examples:
-- User asked to fix a bug and tests were not run: run the tests
-- User asked to create or edit package.json with a test script and tests were not run: run the tests
-- User said "count to 10 and then I will ask you to count to 20" and assistant counted to 10: count to 20
-- Code was written and obvious manual check remains: try it out
-- Assistant asks whether to continue: yes
-- Task complete and changes are ready: commit this
-
-Never suggest:
-- thanks / looks good / evaluative replies
-- questions
-- Claude/pi voice like "let me" or "I'll"
-- new ideas the user did not ask about
-- multiple sentences
-- unsafe or sensitive actions, including security incidents, credentials, harm, or private data
-
-If the user explicitly said what they will ask next, suggest that exact next request.
-If a file was created/edited and tests/checks were not run, the next step is clear: suggest running the relevant test/check.
-Only reply with nothing when there is genuinely no plausible next user prompt.
-Reply with only the suggestion text.`;
 
 class SuggestionEditor extends CustomEditor {
 	handleInput(data: string): void {
@@ -202,7 +167,7 @@ async function generateSuggestion(
 	const response = await completeSimple(
 		model,
 		{
-			systemPrompt: SUGGESTION_SYSTEM_PROMPT,
+			systemPrompt: loadSuggestionSystemPrompt(ctx.cwd, (message) => debug(ctx, message)),
 			messages: [
 				{
 					role: "user",
@@ -223,6 +188,27 @@ async function generateSuggestion(
 	}
 	return extractAssistantText(response);
 }
+
+function loadSuggestionSystemPrompt(cwd: string, onWarning?: (message: string) => void): string {
+	const packagePromptPath = join(resolvePackageRoot(cwd), ...PROMPT_RELATIVE_PATH);
+	try {
+		return readFileSync(packagePromptPath, "utf-8").trim();
+	} catch (error) {
+		onWarning?.(`prompt load failed: ${packagePromptPath}: ${error instanceof Error ? error.message : String(error)}`);
+		return FALLBACK_SUGGESTION_SYSTEM_PROMPT;
+	}
+}
+
+function resolvePackageRoot(cwd: string): string {
+	let dir = import.meta.dirname;
+	while (dir !== join(dir, "..")) {
+		if (existsSync(join(dir, "package.json")) && existsSync(join(dir, "src", "index.ts"))) return dir;
+		dir = join(dir, "..");
+	}
+	return cwd;
+}
+
+const FALLBACK_SUGGESTION_SYSTEM_PROMPT = `[SUGGESTION MODE: Suggest what the user might naturally type next into pi.]\n\nReply with only a short natural next prompt, or nothing if unclear.`;
 
 function buildSuggestionContext(messages: Message[]): string {
 	const recent = messages.slice(-8).map(formatMessageForSuggestion).filter(Boolean);
@@ -405,6 +391,7 @@ export const __test__ = {
 	extractMessageText,
 	formatMessageForSuggestion,
 	getMessageRole,
+	loadSuggestionSystemPrompt,
 	mergeConfigInputs,
 	parseConfigInput,
 	parseModelSpec,

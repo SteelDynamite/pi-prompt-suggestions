@@ -52,6 +52,8 @@ Project config overrides global config.
 
 `model` uses `provider/modelId`. If omitted or invalid, the extension falls back to the active Pi model.
 
+The suggestion-generation system prompt lives in [`prompts/suggestion-system-prompt.md`](prompts/suggestion-system-prompt.md).
+
 See [`docs/plan.md`](docs/plan.md) for the implementation plan.
 
 ## Development

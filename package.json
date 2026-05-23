@@ -24,6 +24,7 @@
   "files": [
     "src",
     "docs",
+    "prompts",
     "README.md",
     "CHANGELOG.md"
   ],
