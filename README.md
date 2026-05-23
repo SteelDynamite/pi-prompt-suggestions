@@ -17,22 +17,16 @@ Behavior:
 
 ## Install
 
+From npm:
+
+```bash
+pi install npm:pi-prompt-suggestions
+```
+
 From GitHub:
 
 ```bash
-pi install git:github.com/SteelDynamite/pi-prompt-suggestions@master
-```
-
-Latest release tag currently points to the older below-editor implementation:
-
-```bash
-pi install git:github.com/SteelDynamite/pi-prompt-suggestions@v0.1.1
-```
-
-After npm publishing:
-
-```bash
-pi install npm:pi-prompt-suggestions@0.1.1
+pi install git:github.com/SteelDynamite/pi-prompt-suggestions
 ```
 
 ## Configuration
