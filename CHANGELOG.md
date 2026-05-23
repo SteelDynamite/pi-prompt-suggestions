@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Loads the suggestion system prompt from `prompts/suggestion-system-prompt.md`.
+- Adds global/project config files for `enabled`, `model`, `maxTokens`, and `maxChars`.
+- Supports Enter on an empty editor to submit the visible suggestion immediately.
+- Adds stricter output filtering for meta text, labels, error text, markdown formatting, word count, assistant voice, and evaluative replies.
+- Adds README disclaimer.
+
+## 0.1.1 - 2026-05-23
+
+- Moved the suggestion system prompt into a packaged markdown file.
+
 ## 0.1.0 - 2026-05-23
 
 Initial release.

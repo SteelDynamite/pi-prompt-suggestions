@@ -21,8 +21,10 @@ Expected behavior on startup:
 
 1. A dim suggestion appears below the editor: `→ run the tests`.
 2. Press Right Arrow while the editor is empty.
-3. The editor fills with `run the tests`.
-4. Typing instead clears the suggestion.
+3. The editor fills with `run the tests` without submitting.
+4. Or press Enter while the editor is empty.
+5. The suggestion is submitted immediately.
+6. Typing instead clears the suggestion.
 
 You can also show the test suggestion again with:
 

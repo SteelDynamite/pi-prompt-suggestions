@@ -7,8 +7,9 @@ Add Claude Code-like suggested next prompts to pi as an extension, without chang
 The extension will:
 
 - Generate a short suggested next user prompt after an agent loop finishes.
-- Display the suggestion near the input editor, not as inline ghost text.
+- Display the suggestion below the input editor, not as inline ghost text.
 - Accept the suggestion with Right Arrow when the input editor is empty.
+- Submit the suggestion with Enter when the input editor is empty.
 - Avoid interfering with existing Tab/autocomplete behavior.
 
 ## UX
@@ -21,7 +22,8 @@ When pi finishes responding, show a dim hint below the editor:
 
 Behavior:
 
-- Press `Right Arrow` on an empty input to fill the editor with the suggestion.
+- Press `Right Arrow` on an empty input to fill the editor with the suggestion without submitting.
+- Press `Enter` on an empty input to submit the suggestion immediately.
 - Start typing anything else to clear the suggestion.
 - Submit normally with Enter after accepting/editing.
 - No suggestion is shown if the next step is not obvious.
@@ -35,7 +37,8 @@ Behavior:
 3. Render the suggestion using `ctx.ui.setWidget()`.
 4. Replace the editor with a small `CustomEditor` subclass via `ctx.ui.setEditorComponent()`.
 5. Accept the suggestion on Right Arrow only when the editor is empty.
-6. Clear stale suggestions on user input, new agent turns, session changes, and reload/shutdown.
+6. Submit the suggestion on Enter only when the editor is empty.
+7. Clear stale suggestions on user input, new agent turns, session changes, and reload/shutdown.
 
 ### Pi core responsibilities
 
@@ -112,10 +115,19 @@ Subclass pi's `CustomEditor`:
 ```ts
 class SuggestionEditor extends CustomEditor {
   handleInput(data: string): void {
-    if (isRightArrow(data) && this.getText().length === 0 && suggestion) {
-      this.setText(suggestion);
-      clearSuggestion();
-      return;
+    if (this.getText().length === 0 && suggestion) {
+      if (isRightArrow(data)) {
+        this.setText(suggestion);
+        clearSuggestion();
+        return;
+      }
+
+      if (isEnter(data)) {
+        this.setText(suggestion);
+        clearSuggestion();
+        super.handleInput(data);
+        return;
+      }
     }
 
     if (suggestion && isUserEditKey(data)) {
@@ -130,7 +142,9 @@ class SuggestionEditor extends CustomEditor {
 Important constraints:
 
 - Do not use `registerShortcut("right")`; it would consume Right Arrow globally and break cursor movement.
-- Only intercept Right Arrow when the editor is empty and a suggestion exists.
+- Only intercept Right Arrow/Enter when the editor is empty and a suggestion exists.
+- Right Arrow fills the editor without submitting.
+- Enter fills the editor and passes through to normal submit handling.
 - Otherwise pass through to `super.handleInput(data)`.
 
 ### 4. Install editor on `session_start`
@@ -182,7 +196,7 @@ pi.on("agent_end", async (event, ctx) => {
 
 ### 6. Suggestion prompt
 
-Use a strict prompt modeled after Claude Code's observed behavior:
+Use the strict prompt in `prompts/suggestion-system-prompt.md`, modeled after Claude Code's observed behavior:
 
 ```text
 [SUGGESTION MODE: Suggest what the user might naturally type next into pi.]
@@ -230,30 +244,39 @@ Inputs:
 - Small bounded max token limit; current implementation uses 256 so reasoning models have room to emit visible text
 - Do not pass `temperature`; some Pi providers/models reject it
 
-Open decision:
+Model selection:
 
-- Use current model by default.
-- Later add config for a cheaper/faster model.
+- Use the active Pi model by default.
+- Optionally use config `model` as `provider/modelId` for a cheaper/faster suggestion model.
+- If the configured model is missing or invalid, fall back to the active Pi model.
 
 ### 8. Sanitize output
 
 Reject suggestions that are likely bad:
 
 - empty
-- more than 80 characters
+- more than `maxChars` characters, default 80
+- more than 12 words
+- fewer than 2 words unless the single word is an allowed command/confirmation like `yes`, `continue`, `commit`, or `/help`
 - more than one sentence
 - contains newline
-- starts with quotes and cannot be cleaned
+- contains markdown formatting such as bullets or `**`
+- starts with labels like `Suggestion:` or `User:`
+- wraps meta text like `[no suggestion]` or `(silence)`
+- is model meta-output like `no suggestion`, `nothing to suggest`, `silence`, or `stay silent`
+- is provider/error text like `api error:`, `prompt is too long`, `request timed out`, or `invalid api key`
 - starts with assistant voice:
   - `let me`
   - `I'll`
   - `I can`
   - `Here's`
 - ends with `?`
-- is only gratitude/evaluation:
+- is gratitude/evaluation:
   - `thanks`
   - `thank you`
   - `looks good`
+  - `great`
+  - `perfect`
 
 Normalize:
 
@@ -288,7 +311,6 @@ Supported options:
 ```ts
 const config = {
   enabled: true,
-  acceptKey: "right",
   placement: "belowEditor",
   maxChars: 80,
   maxTokens: 256,
@@ -343,7 +365,8 @@ Possible future additions:
 
 - After a successful obvious task, a short suggestion appears below the editor.
 - Pressing Right Arrow on an empty editor fills the suggestion.
-- Pressing Right Arrow with non-empty editor behaves normally.
+- Pressing Enter on an empty editor submits the suggestion.
+- Pressing Right Arrow or Enter with non-empty editor behaves normally.
 - Typing clears the suggestion.
 - Tab/autocomplete behavior is unchanged.
 - No suggestion appears for unclear next steps.
@@ -352,9 +375,8 @@ Possible future additions:
 ## Future Improvements
 
 1. Native inline ghost text if pi core adds editor suggestion primitives.
-2. Configurable suggestion model.
-3. User command to enable/disable suggestions.
-4. Heuristic suggestions without model call for common cases:
+2. User command to enable/disable suggestions.
+3. Heuristic suggestions without model call for common cases:
    - tests not run
    - git changes present
    - assistant asked yes/no

@@ -7,13 +7,21 @@ Disclaimer: this is clanker slop.
 Behavior:
 
 - Generate a short next-prompt suggestion after `agent_end`.
-- Show it near the input editor.
+- Show it below the input editor.
 - Accept it with Right Arrow when the editor is empty.
+- Submit it immediately with Enter when the editor is empty.
 - Leave Tab/autocomplete behavior unchanged.
+- Reject common bad model outputs such as questions, meta text, labels, errors, markdown formatting, evaluative replies, and overlong suggestions.
 
 ## Install
 
 From GitHub:
+
+```bash
+pi install git:github.com/SteelDynamite/pi-prompt-suggestions@master
+```
+
+Latest release tag:
 
 ```bash
 pi install git:github.com/SteelDynamite/pi-prompt-suggestions@v0.1.1
@@ -54,7 +62,7 @@ Project config overrides global config.
 
 `model` uses `provider/modelId`. If omitted or invalid, the extension falls back to the active Pi model.
 
-The suggestion-generation system prompt lives in [`prompts/suggestion-system-prompt.md`](prompts/suggestion-system-prompt.md).
+The suggestion-generation system prompt lives in [`prompts/suggestion-system-prompt.md`](prompts/suggestion-system-prompt.md). Edit that file if you want to change the generation instructions before packaging/installing from source.
 
 See [`docs/plan.md`](docs/plan.md) for the implementation plan.
 
