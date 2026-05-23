@@ -9,7 +9,7 @@ import {
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { completeSimple, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
-import { Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const WIDGET_KEY = "next-prompt-suggestion";
 const DEFAULT_MAX_CHARS = 80;
@@ -18,8 +18,12 @@ const GLOBAL_CONFIG_RELATIVE_PATH = ["extensions", "prompt-suggestions.json"];
 const PROJECT_CONFIG_RELATIVE_PATH = [".pi", "prompt-suggestions.json"];
 const PROMPT_RELATIVE_PATH = ["prompts", "suggestion-system-prompt.md"];
 
+type SuggestionDisplayMode = "ghost" | "belowEditor";
+
 interface PromptSuggestionsConfig {
 	enabled: boolean;
+	acceptTab: boolean;
+	display: SuggestionDisplayMode;
 	maxChars: number;
 	maxTokens: number;
 	model?: string;
@@ -30,11 +34,33 @@ type PromptSuggestionsConfigInput = Partial<PromptSuggestionsConfig>;
 let suggestion: string | undefined;
 let generationId = 0;
 let lastCtx: ExtensionContext | undefined;
+let currentEditor: SuggestionEditor | undefined;
 
 class SuggestionEditor extends CustomEditor {
+	requestRender(): void {
+		this.tui.requestRender(true);
+	}
+
+	render(width: number): string[] {
+		const lines = super.render(width);
+		const config = lastCtx ? loadConfig(lastCtx.cwd) : mergeConfigInputs();
+		if (config.display !== "ghost" || !suggestion || this.getText().length > 0) return lines;
+
+		const cursor = "\x1b[7m \x1b[0m";
+		const contentLineIndex = lines.length >= 3 ? 1 : lines.findIndex((line) => line.includes(cursor));
+		if (contentLineIndex === -1) return lines;
+
+		const available = Math.max(0, width - 1);
+		const ghost = `\x1b[2;90m${truncateToWidth(suggestion, available)}\x1b[0m`;
+		const rendered = cursor + ghost;
+		lines[contentLineIndex] = rendered + " ".repeat(Math.max(0, width - visibleWidth(rendered)));
+		return lines;
+	}
+
 	handleInput(data: string): void {
 		if (this.getText().length === 0 && suggestion) {
-			if (matchesKey(data, Key.right)) {
+			const config = lastCtx ? loadConfig(lastCtx.cwd) : mergeConfigInputs();
+			if (matchesKey(data, Key.right) || (config.acceptTab && matchesKey(data, Key.tab))) {
 				this.setText(suggestion);
 				clearSuggestion();
 				return;
@@ -57,23 +83,13 @@ class SuggestionEditor extends CustomEditor {
 }
 
 export default function promptSuggestions(pi: ExtensionAPI) {
-	if (process.env.PI_PROMPT_SUGGESTIONS_TEST === "1") {
-		pi.registerCommand("next-suggestion-test", {
-			description: "Show a test next-prompt suggestion",
-			handler: async (_args, ctx) => {
-				lastCtx = ctx;
-				showSuggestion("run the tests", ctx);
-			},
-		});
-	}
-
 	pi.on("session_start", (_event, ctx) => {
 		lastCtx = ctx;
 		clearSuggestion(ctx);
-		ctx.ui.setEditorComponent((tui, theme, keybindings) => new SuggestionEditor(tui, theme, keybindings));
-		if (process.env.PI_PROMPT_SUGGESTIONS_TEST === "1") {
-			showSuggestion("run the tests", ctx);
-		}
+		ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+			currentEditor = new SuggestionEditor(tui, theme, keybindings);
+			return currentEditor;
+		});
 	});
 
 	pi.on("agent_start", (_event, ctx) => {
@@ -89,6 +105,7 @@ export default function promptSuggestions(pi: ExtensionAPI) {
 	pi.on("session_shutdown", (_event, ctx) => {
 		clearSuggestion(ctx);
 		ctx.ui.setEditorComponent(undefined);
+		currentEditor = undefined;
 		lastCtx = undefined;
 	});
 
@@ -141,6 +158,12 @@ function showSuggestion(text: string, ctx = lastCtx): void {
 
 function renderSuggestion(ctx = lastCtx): void {
 	if (!ctx || !suggestion) return;
+	const config = loadConfig(ctx.cwd, (message) => debug(ctx, message));
+	if (config.display === "ghost") {
+		ctx.ui.setWidget(WIDGET_KEY, undefined);
+		currentEditor?.requestRender();
+		return;
+	}
 	ctx.ui.setWidget(
 		WIDGET_KEY,
 		(_tui, theme) => ({
@@ -390,6 +413,14 @@ function parseConfigInput(
 		if (typeof value.model === "string" && value.model.trim()) config.model = value.model.trim();
 		else onWarning?.(`config ignored: ${path}: model must be non-empty string`);
 	}
+	if ("acceptTab" in value) {
+		if (typeof value.acceptTab === "boolean") config.acceptTab = value.acceptTab;
+		else onWarning?.(`config ignored: ${path}: acceptTab must be boolean`);
+	}
+	if ("display" in value) {
+		if (value.display === "ghost" || value.display === "belowEditor") config.display = value.display;
+		else onWarning?.(`config ignored: ${path}: display must be \"ghost\" or \"belowEditor\"`);
+	}
 	if ("maxChars" in value) {
 		if (isPositiveInteger(value.maxChars)) config.maxChars = value.maxChars;
 		else onWarning?.(`config ignored: ${path}: maxChars must be positive integer`);
@@ -404,6 +435,8 @@ function parseConfigInput(
 function mergeConfigInputs(...configs: PromptSuggestionsConfigInput[]): PromptSuggestionsConfig {
 	return {
 		enabled: true,
+		acceptTab: false,
+		display: "ghost",
 		maxChars: DEFAULT_MAX_CHARS,
 		maxTokens: DEFAULT_MAX_TOKENS,
 		...Object.assign({}, ...configs),

@@ -3,8 +3,11 @@
 ## Unreleased
 
 - Loads the suggestion system prompt from `prompts/suggestion-system-prompt.md`.
-- Adds global/project config files for `enabled`, `model`, `maxTokens`, and `maxChars`.
+- Adds global/project config files for `enabled`, `acceptTab`, `display`, `model`, `maxTokens`, and `maxChars`.
 - Supports Enter on an empty editor to submit the visible suggestion immediately.
+- Adds `display` config with default `ghost` mode and `belowEditor` fallback.
+- Adds opt-in `acceptTab` config for accepting visible suggestions with Tab.
+- Removes test-only startup suggestion and command from packaged extension code.
 - Adds stricter output filtering for meta text, labels, error text, markdown formatting, word count, assistant voice, and evaluative replies.
 - Adds README disclaimer.
 

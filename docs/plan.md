@@ -7,14 +7,21 @@ Add Claude Code-like suggested next prompts to pi as an extension, without chang
 The extension will:
 
 - Generate a short suggested next user prompt after an agent loop finishes.
-- Display the suggestion below the input editor, not as inline ghost text.
+- Display the suggestion as inline ghost text by default, with a below-editor fallback mode.
 - Accept the suggestion with Right Arrow when the input editor is empty.
 - Submit the suggestion with Enter when the input editor is empty.
-- Avoid interfering with existing Tab/autocomplete behavior.
+- Optionally accept the suggestion with Tab when enabled.
+- Avoid interfering with existing Tab/autocomplete behavior by default.
 
 ## UX
 
-When pi finishes responding, show a dim hint below the editor:
+When pi finishes responding, show a dim ghost hint in the editor:
+
+```text
+run the tests
+```
+
+Fallback `belowEditor` mode shows:
 
 ```text
 → run the tests
@@ -24,6 +31,7 @@ Behavior:
 
 - Press `Right Arrow` on an empty input to fill the editor with the suggestion without submitting.
 - Press `Enter` on an empty input to submit the suggestion immediately.
+- If `acceptTab` is enabled, press `Tab` on an empty input to fill the editor without submitting.
 - Start typing anything else to clear the suggestion.
 - Submit normally with Enter after accepting/editing.
 - No suggestion is shown if the next step is not obvious.
@@ -34,11 +42,12 @@ Behavior:
 
 1. Subscribe to `agent_end`.
 2. Generate a suggestion asynchronously.
-3. Render the suggestion using `ctx.ui.setWidget()`.
+3. Render the suggestion as editor ghost text, or using `ctx.ui.setWidget()` in fallback mode.
 4. Replace the editor with a small `CustomEditor` subclass via `ctx.ui.setEditorComponent()`.
 5. Accept the suggestion on Right Arrow only when the editor is empty.
 6. Submit the suggestion on Enter only when the editor is empty.
-7. Clear stale suggestions on user input, new agent turns, session changes, and reload/shutdown.
+7. Optionally accept the suggestion on Tab only when the editor is empty and `acceptTab` is enabled.
+8. Clear stale suggestions on user input, new agent turns, session changes, and reload/shutdown.
 
 ### Pi core responsibilities
 
@@ -85,9 +94,11 @@ State rules:
 - `generationId` invalidates stale async model responses.
 - `lastCtx` lets the custom editor accept/clear via current UI context.
 
-### 2. Render suggestion widget
+### 2. Render suggestion
 
-Use a widget below the editor:
+Default `ghost` mode renders inside the custom editor by modifying the editor render output. This is intentionally hacky and may need adjustment if Pi editor rendering changes.
+
+Fallback `belowEditor` mode uses a widget below the editor:
 
 ```ts
 ctx.ui.setWidget(
@@ -311,7 +322,8 @@ Supported options:
 ```ts
 const config = {
   enabled: true,
-  placement: "belowEditor",
+  acceptTab: false,
+  display: "ghost",
   maxChars: 80,
   maxTokens: 256,
   model: undefined,
@@ -330,6 +342,8 @@ Project config overrides global config:
 ```json
 {
   "enabled": true,
+  "acceptTab": false,
+  "display": "ghost",
   "model": "openai/gpt-5-mini",
   "maxTokens": 256,
   "maxChars": 80
@@ -363,12 +377,12 @@ Possible future additions:
 
 ## Acceptance Criteria
 
-- After a successful obvious task, a short suggestion appears below the editor.
+- After a successful obvious task, a short suggestion appears as ghost text, or below the editor when `display` is `belowEditor`.
 - Pressing Right Arrow on an empty editor fills the suggestion.
 - Pressing Enter on an empty editor submits the suggestion.
 - Pressing Right Arrow or Enter with non-empty editor behaves normally.
 - Typing clears the suggestion.
-- Tab/autocomplete behavior is unchanged.
+- Tab/autocomplete behavior is unchanged unless `acceptTab` is enabled.
 - No suggestion appears for unclear next steps.
 - Suggestion generation failure is silent and non-blocking.
 

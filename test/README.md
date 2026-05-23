@@ -9,7 +9,9 @@ pi
 
 Pi auto-discovers `.pi/extensions/next-prompt-suggestion.ts` and enables debug notifications for model-generated suggestions.
 
-This test project also includes `.pi/prompt-suggestions.json`. Add a `model` field there to test a dedicated suggestion model:
+This test project also includes `.pi/prompt-suggestions.json`. It defaults to ghost display and enables `acceptTab` for testing. Set `display` to `belowEditor` to test the fallback widget mode.
+
+Add a `model` field there to test a dedicated suggestion model:
 
 ```json
 {
@@ -17,22 +19,19 @@ This test project also includes `.pi/prompt-suggestions.json`. Add a `model` fie
 }
 ```
 
-Expected behavior on startup:
+To test model generation, send a normal prompt with an obvious next step. After the agent finishes, a suggestion should appear as dim ghost text in the editor.
 
-1. A dim suggestion appears below the editor: `→ run the tests`.
-2. Press Right Arrow while the editor is empty.
-3. The editor fills with `run the tests` without submitting.
-4. Or press Enter while the editor is empty.
-5. The suggestion is submitted immediately.
-6. Typing instead clears the suggestion.
+Expected behavior when a suggestion is visible:
 
-You can also show the test suggestion again with:
+1. Press Right Arrow while the editor is empty.
+2. The editor fills with the suggestion without submitting.
+3. Or press Tab while the editor is empty.
+4. The editor fills with the suggestion without submitting.
+5. Or press Enter while the editor is empty.
+6. The suggestion is submitted immediately.
+7. Typing instead clears the suggestion.
 
-```text
-/next-suggestion-test
-```
-
-To test model generation, send a normal prompt. After the agent finishes, debug notifications should show one of:
+Debug notifications should show one of:
 
 - `generating...`
 - `raw: "..."`
