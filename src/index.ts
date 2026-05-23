@@ -17,6 +17,28 @@ const DEFAULT_MAX_TOKENS = 256;
 const GLOBAL_CONFIG_RELATIVE_PATH = ["extensions", "prompt-suggestions.json"];
 const PROJECT_CONFIG_RELATIVE_PATH = [".pi", "prompt-suggestions.json"];
 const PROMPT_RELATIVE_PATH = ["prompts", "suggestion-system-prompt.md"];
+const GHOST_CURSOR = "\x1b[7m \x1b[0m";
+const GHOST_STYLE = "\x1b[2;90m";
+const ANSI_RESET = "\x1b[0m";
+const ALLOWED_SINGLE_WORD_SUGGESTIONS = new Set([
+	"yes",
+	"yeah",
+	"yep",
+	"yea",
+	"yup",
+	"sure",
+	"ok",
+	"okay",
+	"push",
+	"commit",
+	"deploy",
+	"stop",
+	"continue",
+	"check",
+	"exit",
+	"quit",
+	"no",
+]);
 
 type SuggestionDisplayMode = "ghost" | "belowEditor";
 
@@ -34,6 +56,7 @@ type PromptSuggestionsConfigInput = Partial<PromptSuggestionsConfig>;
 let suggestion: string | undefined;
 let generationId = 0;
 let lastCtx: ExtensionContext | undefined;
+let currentConfig: PromptSuggestionsConfig = mergeConfigInputs();
 let currentEditor: SuggestionEditor | undefined;
 
 class SuggestionEditor extends CustomEditor {
@@ -43,24 +66,13 @@ class SuggestionEditor extends CustomEditor {
 
 	render(width: number): string[] {
 		const lines = super.render(width);
-		const config = lastCtx ? loadConfig(lastCtx.cwd) : mergeConfigInputs();
-		if (config.display !== "ghost" || !suggestion || this.getText().length > 0) return lines;
-
-		const cursor = "\x1b[7m \x1b[0m";
-		const contentLineIndex = lines.length >= 3 ? 1 : lines.findIndex((line) => line.includes(cursor));
-		if (contentLineIndex === -1) return lines;
-
-		const available = Math.max(0, width - 1);
-		const ghost = `\x1b[2;90m${truncateToWidth(suggestion, available)}\x1b[0m`;
-		const rendered = cursor + ghost;
-		lines[contentLineIndex] = rendered + " ".repeat(Math.max(0, width - visibleWidth(rendered)));
-		return lines;
+		if (currentConfig.display !== "ghost" || !suggestion || this.getText().length > 0) return lines;
+		return renderGhostSuggestionLines(lines, width, suggestion);
 	}
 
 	handleInput(data: string): void {
 		if (this.getText().length === 0 && suggestion) {
-			const config = lastCtx ? loadConfig(lastCtx.cwd) : mergeConfigInputs();
-			if (matchesKey(data, Key.right) || (config.acceptTab && matchesKey(data, Key.tab))) {
+			if (matchesKey(data, Key.right) || (currentConfig.acceptTab && matchesKey(data, Key.tab))) {
 				this.setText(suggestion);
 				clearSuggestion();
 				return;
@@ -85,6 +97,7 @@ class SuggestionEditor extends CustomEditor {
 export default function promptSuggestions(pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		lastCtx = ctx;
+		currentConfig = loadConfig(ctx.cwd, (message) => debug(ctx, message));
 		clearSuggestion(ctx);
 		ctx.ui.setEditorComponent((tui, theme, keybindings) => {
 			currentEditor = new SuggestionEditor(tui, theme, keybindings);
@@ -145,9 +158,11 @@ export default function promptSuggestions(pi: ExtensionAPI) {
 }
 
 function clearSuggestion(ctx = lastCtx): void {
+	const hadSuggestion = suggestion !== undefined;
 	generationId++;
 	suggestion = undefined;
 	ctx?.ui.setWidget(WIDGET_KEY, undefined);
+	if (hadSuggestion && currentConfig.display === "ghost") currentEditor?.requestRender();
 }
 
 function showSuggestion(text: string, ctx = lastCtx): void {
@@ -158,8 +173,8 @@ function showSuggestion(text: string, ctx = lastCtx): void {
 
 function renderSuggestion(ctx = lastCtx): void {
 	if (!ctx || !suggestion) return;
-	const config = loadConfig(ctx.cwd, (message) => debug(ctx, message));
-	if (config.display === "ghost") {
+	currentConfig = loadConfig(ctx.cwd, (message) => debug(ctx, message));
+	if (currentConfig.display === "ghost") {
 		ctx.ui.setWidget(WIDGET_KEY, undefined);
 		currentEditor?.requestRender();
 		return;
@@ -171,6 +186,18 @@ function renderSuggestion(ctx = lastCtx): void {
 			invalidate: () => {},
 		}),
 		{ placement: "belowEditor" },
+	);
+}
+
+function renderGhostSuggestionLines(lines: string[], width: number, text: string): string[] {
+	const contentLineIndex = lines.length >= 3 ? 1 : lines.findIndex((line) => line.includes(GHOST_CURSOR));
+	if (contentLineIndex === -1) return lines;
+
+	const available = Math.max(0, width - 1);
+	const ghost = `${GHOST_STYLE}${truncateToWidth(text, available)}${ANSI_RESET}`;
+	const rendered = GHOST_CURSOR + ghost;
+	return lines.map((line, index) =>
+		index === contentLineIndex ? rendered + " ".repeat(Math.max(0, width - visibleWidth(rendered))) : line,
 	);
 }
 
@@ -340,25 +367,7 @@ function isErrorSuggestion(lower: string): boolean {
 
 function isAllowedSingleWordSuggestion(lower: string, clean: string): boolean {
 	if (clean.startsWith("/")) return true;
-	return new Set([
-		"yes",
-		"yeah",
-		"yep",
-		"yea",
-		"yup",
-		"sure",
-		"ok",
-		"okay",
-		"push",
-		"commit",
-		"deploy",
-		"stop",
-		"continue",
-		"check",
-		"exit",
-		"quit",
-		"no",
-	]).has(lower);
+	return ALLOWED_SINGLE_WORD_SUGGESTIONS.has(lower);
 }
 
 function isUserEditKey(data: string): boolean {
@@ -489,6 +498,7 @@ export const __test__ = {
 	mergeConfigInputs,
 	parseConfigInput,
 	parseModelSpec,
+	renderGhostSuggestionLines,
 	sanitizeSuggestion,
 	truncatePlain,
 };

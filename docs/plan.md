@@ -62,18 +62,25 @@ Optional future core improvement:
 
 ## Files
 
-Proposed location:
+Current package layout:
 
 ```text
-~/.pi/agent/extensions/next-prompt-suggestion.ts
+src/index.ts                         # extension implementation
+prompts/suggestion-system-prompt.md  # model instruction prompt
+README.md                            # user docs
+docs/plan.md                         # implementation notes
+tests/*.test.ts                      # automated helper tests
+test/.pi/extensions/*.ts             # local interactive test harness
 ```
 
-Optional package layout if dependencies/config grow:
+Installed package entrypoint is declared in `package.json`:
 
-```text
-~/.pi/agent/extensions/next-prompt-suggestion/
-├── index.ts
-└── README.md
+```json
+{
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  }
+}
 ```
 
 ## Implementation Steps
@@ -394,4 +401,4 @@ Possible future additions:
    - tests not run
    - git changes present
    - assistant asked yes/no
-5. Per-project style learning from prompt history.
+4. Per-project style learning from prompt history.
