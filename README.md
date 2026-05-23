@@ -2,6 +2,8 @@
 
 Pi extension that suggests a natural next prompt after an agent response.
 
+Disclaimer: this is clanker slop.
+
 Behavior:
 
 - Generate a short next-prompt suggestion after `agent_end`.
@@ -14,13 +16,13 @@ Behavior:
 From GitHub:
 
 ```bash
-pi install git:github.com/SteelDynamite/pi-prompt-suggestions@v0.1.0
+pi install git:github.com/SteelDynamite/pi-prompt-suggestions@v0.1.1
 ```
 
 After npm publishing:
 
 ```bash
-pi install npm:pi-prompt-suggestions@0.1.0
+pi install npm:pi-prompt-suggestions@0.1.1
 ```
 
 ## Configuration

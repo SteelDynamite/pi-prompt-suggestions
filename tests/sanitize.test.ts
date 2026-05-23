@@ -22,10 +22,27 @@ describe("sanitizeSuggestion", () => {
 		assert.equal(sanitizeSuggestion("run tests\ncommit this"), undefined);
 	});
 
-	it("rejects questions, long text, and multiple sentences", () => {
+	it("rejects questions, long text, multiple sentences, and word-count violations", () => {
 		assert.equal(sanitizeSuggestion("run the tests?"), undefined);
 		assert.equal(sanitizeSuggestion("run the tests. then commit"), undefined);
 		assert.equal(sanitizeSuggestion("x".repeat(81)), undefined);
+		assert.equal(sanitizeSuggestion("one two three four five six seven eight nine ten eleven twelve thirteen"), undefined);
+		assert.equal(sanitizeSuggestion("banana"), undefined);
+		assert.equal(sanitizeSuggestion("continue"), "continue");
+		assert.equal(sanitizeSuggestion("/help"), "/help");
+	});
+
+	it("rejects meta-output, labels, formatting, and errors", () => {
+		assert.equal(sanitizeSuggestion("done"), undefined);
+		assert.equal(sanitizeSuggestion("no suggestion"), undefined);
+		assert.equal(sanitizeSuggestion("nothing to suggest"), undefined);
+		assert.equal(sanitizeSuggestion("silence"), undefined);
+		assert.equal(sanitizeSuggestion("stay silent"), undefined);
+		assert.equal(sanitizeSuggestion("[no suggestion]"), undefined);
+		assert.equal(sanitizeSuggestion("Suggestion: run the tests"), undefined);
+		assert.equal(sanitizeSuggestion("**run the tests**"), undefined);
+		assert.equal(sanitizeSuggestion("api error: timeout"), undefined);
+		assert.equal(sanitizeSuggestion("request timed out"), undefined);
 	});
 
 	it("rejects assistant voice and evaluative replies", () => {

@@ -51,7 +51,8 @@ describe("configuration helpers", () => {
 	});
 
 	it("uses configured maxChars in sanitizer", () => {
-		assert.equal(sanitizeSuggestion("x".repeat(81), 120), "x".repeat(81));
-		assert.equal(sanitizeSuggestion("x".repeat(121), 120), undefined);
+		const suggestion = "run " + "x".repeat(77);
+		assert.equal(sanitizeSuggestion(suggestion, 120), suggestion);
+		assert.equal(sanitizeSuggestion(suggestion, 80), undefined);
 	});
 });

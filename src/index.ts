@@ -33,10 +33,19 @@ let lastCtx: ExtensionContext | undefined;
 
 class SuggestionEditor extends CustomEditor {
 	handleInput(data: string): void {
-		if (matchesKey(data, Key.right) && this.getText().length === 0 && suggestion) {
-			this.setText(suggestion);
-			clearSuggestion();
-			return;
+		if (this.getText().length === 0 && suggestion) {
+			if (matchesKey(data, Key.right)) {
+				this.setText(suggestion);
+				clearSuggestion();
+				return;
+			}
+
+			if (matchesKey(data, Key.enter)) {
+				this.setText(suggestion);
+				clearSuggestion();
+				super.handleInput(data);
+				return;
+			}
 		}
 
 		if (suggestion && isUserEditKey(data)) {
@@ -269,12 +278,64 @@ function sanitizeSuggestion(text: string, maxChars = DEFAULT_MAX_CHARS): string 
 	if (clean.length > maxChars) return undefined;
 	if (clean.endsWith("?")) return undefined;
 	if (/[.!?].+\S/.test(clean)) return undefined;
+	if (/[\n*]|\*\*/.test(clean)) return undefined;
+	if (/^\w+:\s/.test(clean)) return undefined;
+	if (/^\(.*\)$|^\[.*\]$/.test(clean)) return undefined;
 
 	const lower = clean.toLowerCase();
-	if (/^(let me|i'll|i can|here's)\b/.test(lower)) return undefined;
-	if (/^(thanks|thank you|looks good|sounds good|ok thanks|okay thanks)[!.]?$/i.test(clean)) return undefined;
+	const wordCount = clean.split(/\s+/).length;
+	if (lower === "done") return undefined;
+	if (isMetaSuggestion(lower)) return undefined;
+	if (isErrorSuggestion(lower)) return undefined;
+	if (wordCount > 12) return undefined;
+	if (wordCount < 2 && !isAllowedSingleWordSuggestion(lower, clean)) return undefined;
+	if (/^(let me|i'll|i've|i'm|i can|i would|i think|i notice|here's|here is|here are|that's|this is|this will|you can|you should|you could|sure,|of course|certainly)\b/i.test(clean)) return undefined;
+	if (/thanks|thank you|looks good|sounds good|that works|that worked|that's all|nice|great|perfect|makes sense|awesome|excellent/i.test(clean)) return undefined;
 
 	return clean;
+}
+
+function isMetaSuggestion(lower: string): boolean {
+	return (
+		lower === "nothing found" ||
+		lower.startsWith("nothing to suggest") ||
+		lower.startsWith("no suggestion") ||
+		/\bsilence is\b|\bstay(s|ing)? silent\b/.test(lower) ||
+		/^\W*silence\W*$/.test(lower)
+	);
+}
+
+function isErrorSuggestion(lower: string): boolean {
+	return (
+		lower.startsWith("api error:") ||
+		lower.startsWith("prompt is too long") ||
+		lower.startsWith("request timed out") ||
+		lower.startsWith("invalid api key") ||
+		lower.startsWith("image was too large")
+	);
+}
+
+function isAllowedSingleWordSuggestion(lower: string, clean: string): boolean {
+	if (clean.startsWith("/")) return true;
+	return new Set([
+		"yes",
+		"yeah",
+		"yep",
+		"yea",
+		"yup",
+		"sure",
+		"ok",
+		"okay",
+		"push",
+		"commit",
+		"deploy",
+		"stop",
+		"continue",
+		"check",
+		"exit",
+		"quit",
+		"no",
+	]).has(lower);
 }
 
 function isUserEditKey(data: string): boolean {
