@@ -15,6 +15,12 @@ Behavior:
 - Leave Tab/autocomplete behavior unchanged unless `acceptTab` is enabled.
 - Reject common bad model outputs such as questions, meta text, labels, errors, markdown formatting, evaluative replies, and overlong suggestions.
 
+## Privacy and cost
+
+After each `agent_end`, this extension sends a condensed slice of the just-finished conversation to the configured suggestion model, or to the active Pi model if no suggestion model is configured. That request can include recent user text, assistant text, and tool-call names. Treat it like any other model call: it may incur provider cost and may send conversation context to that provider.
+
+If `PI_PROMPT_SUGGESTIONS_DEBUG=1` is set, debug details are shown in the UI and appended to `next-suggestion-debug.log` in the current working directory. Disable debug logging before working with sensitive prompts.
+
 ## Install
 
 From npm:
