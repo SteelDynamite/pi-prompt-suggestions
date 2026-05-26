@@ -22,6 +22,7 @@
     "node": ">=22"
   },
   "files": [
+    "index.ts",
     "src",
     "docs",
     "prompts",
@@ -35,7 +36,7 @@
   },
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./index.ts"
     ]
   },
   "publishConfig": {
