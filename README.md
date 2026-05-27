@@ -68,6 +68,8 @@ Project config overrides global config.
 
 `display` can be `ghost` or `belowEditor`; default is `ghost`.
 
+`ghost` mode intentionally replaces Pi's editor component so it can render inline ghost text. This can override another custom-editor extension. Use `belowEditor` if editor composition matters more than inline suggestions.
+
 `model` uses `provider/modelId`. If omitted or invalid, the extension falls back to the active Pi model.
 
 The suggestion-generation system prompt lives in [`prompts/suggestion-system-prompt.md`](prompts/suggestion-system-prompt.md). Edit that file if you want to change the generation instructions before packaging/installing from source.

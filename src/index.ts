@@ -99,6 +99,8 @@ export default function promptSuggestions(pi: ExtensionAPI) {
 		lastCtx = ctx;
 		currentConfig = loadConfig(ctx.cwd, (message) => debug(ctx, message));
 		clearSuggestion(ctx);
+		// Intentional: ghost-text rendering owns the editor component while enabled.
+		// This may replace another custom editor extension; use belowEditor display to avoid that tradeoff.
 		ctx.ui.setEditorComponent((tui, theme, keybindings) => {
 			currentEditor = new SuggestionEditor(tui, theme, keybindings);
 			return currentEditor;
