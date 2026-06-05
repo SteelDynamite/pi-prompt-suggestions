@@ -7,6 +7,7 @@ import {
 	type AgentEndEvent,
 	type ExtensionAPI,
 	type ExtensionContext,
+	type InputSource,
 } from "@earendil-works/pi-coding-agent";
 import { completeSimple, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
 import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
@@ -52,10 +53,13 @@ interface PromptSuggestionsConfig {
 }
 
 type PromptSuggestionsConfigInput = Partial<PromptSuggestionsConfig>;
+type PiMode = "tui" | "rpc" | "json" | "print";
+type MaybeModeContext = ExtensionContext & { mode?: PiMode };
 
 let suggestion: string | undefined;
 let generationId = 0;
 let lastCtx: ExtensionContext | undefined;
+let lastInputSource: InputSource | undefined;
 let currentConfig: PromptSuggestionsConfig = mergeConfigInputs();
 let currentEditor: SuggestionEditor | undefined;
 
@@ -98,7 +102,12 @@ export default function promptSuggestions(pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		lastCtx = ctx;
 		currentConfig = loadConfig(ctx.cwd, (message) => debug(ctx, message));
+		lastInputSource = undefined;
 		clearSuggestion(ctx);
+		if (!isSuggestionContextSupported(ctx, lastInputSource)) {
+			currentEditor = undefined;
+			return;
+		}
 		// Intentional: ghost-text rendering owns the editor component while enabled.
 		// This may replace another custom editor extension; use belowEditor display to avoid that tradeoff.
 		ctx.ui.setEditorComponent((tui, theme, keybindings) => {
@@ -112,21 +121,24 @@ export default function promptSuggestions(pi: ExtensionAPI) {
 		clearSuggestion(ctx);
 	});
 
-	pi.on("input", (_event, ctx) => {
+	pi.on("input", (event, ctx) => {
 		lastCtx = ctx;
+		lastInputSource = event.source;
 		clearSuggestion(ctx);
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
 		clearSuggestion(ctx);
-		ctx.ui.setEditorComponent(undefined);
+		if (isSuggestionContextSupported(ctx, lastInputSource)) ctx.ui.setEditorComponent(undefined);
 		currentEditor = undefined;
 		lastCtx = undefined;
+		lastInputSource = undefined;
 	});
 
 	pi.on("agent_end", async (event, ctx) => {
 		lastCtx = ctx;
 		clearSuggestion(ctx);
+		if (!isSuggestionContextSupported(ctx, lastInputSource)) return;
 
 		const config = loadConfig(ctx.cwd, (message) => debug(ctx, message));
 		if (!config.enabled) return debug(ctx, "skipped: disabled by config");
@@ -163,8 +175,36 @@ function clearSuggestion(ctx = lastCtx): void {
 	const hadSuggestion = suggestion !== undefined;
 	generationId++;
 	suggestion = undefined;
-	ctx?.ui.setWidget(WIDGET_KEY, undefined);
+	if (!ctx || !isSuggestionContextSupported(ctx, lastInputSource)) return;
+	ctx.ui.setWidget(WIDGET_KEY, undefined);
 	if (hadSuggestion && currentConfig.display === "ghost") currentEditor?.requestRender();
+}
+
+function isSuggestionContextSupported(ctx: ExtensionContext, inputSource?: InputSource): boolean {
+	return isSuggestionModeSupported(getContextMode(ctx), inputSource, ctx.hasUI);
+}
+
+function isSuggestionModeSupported(mode: PiMode | undefined, inputSource?: InputSource, hasUI = true): boolean {
+	if (mode !== undefined) return mode === "tui";
+	if (!hasUI) return false;
+	return inputSource !== "rpc";
+}
+
+function getContextMode(ctx: ExtensionContext): PiMode | undefined {
+	const mode = (ctx as MaybeModeContext).mode;
+	if (mode === "tui" || mode === "rpc" || mode === "json" || mode === "print") return mode;
+	return getCliMode();
+}
+
+function getCliMode(): PiMode | undefined {
+	for (let index = 0; index < process.argv.length; index++) {
+		const arg = process.argv[index];
+		const value = arg === "--mode" ? process.argv[index + 1] : arg.startsWith("--mode=") ? arg.slice("--mode=".length) : undefined;
+		if (value === "rpc" || value === "json") return value;
+		if (value === "text") return "print";
+		if (arg === "--print" || arg === "-p") return "print";
+	}
+	return undefined;
 }
 
 function showSuggestion(text: string, ctx = lastCtx): void {
@@ -496,6 +536,7 @@ export const __test__ = {
 	extractMessageText,
 	formatMessageForSuggestion,
 	getMessageRole,
+	isSuggestionModeSupported,
 	loadSuggestionSystemPrompt,
 	mergeConfigInputs,
 	parseConfigInput,

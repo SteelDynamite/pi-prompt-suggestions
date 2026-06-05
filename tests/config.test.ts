@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { __test__ } from "../src/index.ts";
 
-const { mergeConfigInputs, parseConfigInput, parseModelSpec, sanitizeSuggestion } = __test__;
+const { isSuggestionModeSupported, mergeConfigInputs, parseConfigInput, parseModelSpec, sanitizeSuggestion } = __test__;
 
 describe("configuration helpers", () => {
 	it("merges config with project values overriding global values", () => {
@@ -67,5 +67,15 @@ describe("configuration helpers", () => {
 		const suggestion = "run " + "x".repeat(77);
 		assert.equal(sanitizeSuggestion(suggestion, 120), suggestion);
 		assert.equal(sanitizeSuggestion(suggestion, 80), undefined);
+	});
+
+	it("supports suggestions only where TUI editor UI is available", () => {
+		assert.equal(isSuggestionModeSupported("tui"), true);
+		assert.equal(isSuggestionModeSupported("rpc"), false);
+		assert.equal(isSuggestionModeSupported("json"), false);
+		assert.equal(isSuggestionModeSupported("print"), false);
+		assert.equal(isSuggestionModeSupported(undefined, "rpc", true), false);
+		assert.equal(isSuggestionModeSupported(undefined, "interactive", true), true);
+		assert.equal(isSuggestionModeSupported(undefined, "interactive", false), false);
 	});
 });

@@ -6,7 +6,8 @@ Disclaimer: this is clanker slop.
 
 Behavior:
 
-- Generate a short next-prompt suggestion after `agent_end`.
+- Generate a short next-prompt suggestion after `agent_end` in TUI mode.
+- Skip non-TUI modes such as RPC, JSON, and print mode.
 - Show it as ghost text in the input editor by default.
 - Optionally show it below the input editor.
 - Accept it with Right Arrow when the editor is empty.
@@ -17,7 +18,9 @@ Behavior:
 
 ## Privacy and cost
 
-After each `agent_end`, this extension sends a condensed slice of the just-finished conversation to the configured suggestion model, or to the active Pi model if no suggestion model is configured. That request can include recent user text, assistant text, and tool-call names. Treat it like any other model call: it may incur provider cost and may send conversation context to that provider.
+In TUI mode after each `agent_end`, this extension sends a condensed slice of the just-finished conversation to the configured suggestion model, or to the active Pi model if no suggestion model is configured. That request can include recent user text, assistant text, and tool-call names. Treat it like any other model call: it may incur provider cost and may send conversation context to that provider.
+
+Non-TUI modes, including RPC/Paseo, JSON, and print mode, are skipped so the extension does not generate suggestions or spend tokens where the editor UI cannot use them.
 
 If `PI_PROMPT_SUGGESTIONS_DEBUG=1` is set, debug details are shown in the UI and appended to `next-suggestion-debug.log` in the current working directory. Disable debug logging before working with sensitive prompts.
 
