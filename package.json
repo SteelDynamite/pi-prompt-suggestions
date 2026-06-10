@@ -4,6 +4,7 @@
   "description": "Pi extension that suggests a natural next prompt after an agent response.",
   "type": "module",
   "private": false,
+  "license": "MIT",
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -27,7 +28,8 @@
     "docs",
     "prompts",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
