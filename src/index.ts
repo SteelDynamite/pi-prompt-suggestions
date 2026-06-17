@@ -1,5 +1,6 @@
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { completeSimple, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
 import {
 	CustomEditor,
 	convertToLlm,
@@ -8,8 +9,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 	type InputSource,
-} from "@earendil-works/pi-coding-agent";
-import { completeSimple, type AssistantMessage, type Message, type Model } from "@earendil-works/pi-ai";
+} from "./pi-local.ts";
 import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 const WIDGET_KEY = "next-prompt-suggestion";
@@ -532,6 +532,7 @@ function debug(ctx: ExtensionContext, message: string): void {
 
 export const __test__ = {
 	buildSuggestionContext,
+	convertToLlm,
 	extractAssistantText,
 	extractMessageText,
 	formatMessageForSuggestion,

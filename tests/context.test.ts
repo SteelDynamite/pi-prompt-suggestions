@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import { __test__ } from "../src/index.ts";
 
-const { buildSuggestionContext, extractAssistantText, extractMessageText, formatMessageForSuggestion, truncatePlain } =
+const { buildSuggestionContext, convertToLlm, extractAssistantText, extractMessageText, formatMessageForSuggestion, truncatePlain } =
 	__test__;
 
 function assistantMessage(content: AssistantMessage["content"]): AssistantMessage {
@@ -43,6 +43,27 @@ describe("suggestion context helpers", () => {
 		assert.equal(extractMessageText(user), "count to 10");
 		assert.equal(extractMessageText(assistant), "1 2 3\n[tool call: write]");
 		assert.equal(formatMessageForSuggestion(assistant), "assistant: 1 2 3\n[tool call: write]");
+	});
+
+	it("converts Pi custom messages to LLM messages", () => {
+		const converted = convertToLlm([
+			{
+				role: "bashExecution",
+				command: "npm test",
+				output: "ok",
+				exitCode: 0,
+				cancelled: false,
+				truncated: false,
+				timestamp: 1,
+			},
+			{ role: "custom", customType: "note", content: "remember this", display: true, timestamp: 2 },
+			{ role: "compactionSummary", summary: "old context", tokensBefore: 100, timestamp: 3 },
+		]);
+
+		assert.equal(converted.length, 3);
+		assert.equal(extractMessageText(converted[0]), "Ran `npm test`\n```\nok\n```");
+		assert.equal(extractMessageText(converted[1]), "remember this");
+		assert.match(extractMessageText(converted[2]), /old context/);
 	});
 
 	it("extracts only visible assistant text from model responses", () => {
