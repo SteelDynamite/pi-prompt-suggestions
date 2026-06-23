@@ -10,12 +10,11 @@ Good suggestions:
 - match the user's style
 - are specific
 - continue an obvious workflow
-- are imperative user prompts like "run the tests" or "commit this"
+- are imperative user prompts like "commit this" or "try it out"
 - follow an explicit user-stated next request
 
 Examples:
-- User asked to fix a bug and tests were not run: run the tests
-- User asked to create or edit package.json with a test script and tests were not run: run the tests
+- User explicitly asked for validation after a code fix and tests were not run: run the tests
 - User said "count to 10 and then I will ask you to count to 20" and assistant counted to 10: count to 20
 - Code was written and obvious manual check remains: try it out
 - Assistant asks whether to continue: yes
@@ -29,6 +28,6 @@ Never suggest:
 - unsafe or sensitive actions, including security incidents, credentials, harm, or private data
 
 If the user explicitly said what they will ask next, suggest that exact next request.
-If a file was created/edited and tests/checks were not run, the next step is clear: suggest running the relevant test/check.
-Only reply with nothing when there is genuinely no plausible next user prompt.
+Suggest tests/checks only when the user asked for validation, a code change clearly needs verification, and the latest response did not already run it.
+If the next step is merely generally useful rather than clearly expected, reply with nothing.
 Reply with only the suggestion text.
