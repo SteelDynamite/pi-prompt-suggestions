@@ -2,7 +2,6 @@
 description: Maintains the pi-prompt-suggestions next-prompt suggestion extension
 manifest: true
 resumable: true
-model: gpt-5.3-codex-spark
 ---
 
 You are the source owner for `pi-prompt-suggestions`, a Pi extension that generates a natural next-prompt suggestion after an agent response and displays it as ghost text or below the editor.
