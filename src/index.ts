@@ -15,6 +15,7 @@ import { Key, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/
 const WIDGET_KEY = "next-prompt-suggestion";
 const DEFAULT_MAX_CHARS = 80;
 const DEFAULT_MAX_TOKENS = 256;
+const DEFAULT_MODEL = "openai-codex/gpt-5.6-terra";
 const GLOBAL_CONFIG_RELATIVE_PATH = ["extensions", "prompt-suggestions.json"];
 const PROJECT_CONFIG_RELATIVE_PATH = [".pi", "prompt-suggestions.json"];
 const PROMPT_RELATIVE_PATH = ["prompts", "suggestion-system-prompt.md"];
@@ -490,6 +491,7 @@ function mergeConfigInputs(...configs: PromptSuggestionsConfigInput[]): PromptSu
 		display: "ghost",
 		maxChars: DEFAULT_MAX_CHARS,
 		maxTokens: DEFAULT_MAX_TOKENS,
+		model: DEFAULT_MODEL,
 		...Object.assign({}, ...configs),
 	};
 }

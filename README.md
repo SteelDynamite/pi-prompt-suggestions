@@ -18,7 +18,7 @@ Behavior:
 
 ## Privacy and cost
 
-In TUI mode after each `agent_end`, this extension sends a condensed slice of the just-finished conversation to the configured suggestion model, or to the active Pi model if no suggestion model is configured. That request can include recent user text, assistant text, and tool-call names. Treat it like any other model call: it may incur provider cost and may send conversation context to that provider.
+In TUI mode after each `agent_end`, this extension sends a condensed slice of the just-finished conversation to `openai-codex/gpt-5.6-terra` by default. A configured suggestion model overrides that default; an invalid configured model falls back to the active Pi model. That request can include recent user text, assistant text, and tool-call names. Treat it like any other model call: it may incur provider cost and may send conversation context to that provider.
 
 Non-TUI modes, including RPC/Paseo, JSON, and print mode, are skipped so the extension does not generate suggestions or spend tokens where the editor UI cannot use them.
 
@@ -40,7 +40,7 @@ pi install git:github.com/SteelDynamite/pi-prompt-suggestions
 
 ## Configuration
 
-By default, suggestions use the active Pi model.
+By default, suggestions use `openai-codex/gpt-5.6-terra`.
 
 Optional global config:
 
@@ -73,7 +73,7 @@ Project config overrides global config.
 
 `ghost` mode intentionally replaces Pi's editor component so it can render inline ghost text. This can override another custom-editor extension. Use `belowEditor` if editor composition matters more than inline suggestions.
 
-`model` uses `provider/modelId`. If omitted or invalid, the extension falls back to the active Pi model.
+`model` uses `provider/modelId` and overrides the default Terra model. If a configured model is invalid, the extension falls back to the active Pi model.
 
 The suggestion-generation system prompt lives in [`prompts/suggestion-system-prompt.md`](prompts/suggestion-system-prompt.md). Edit that file if you want to change the generation instructions before packaging/installing from source.
 

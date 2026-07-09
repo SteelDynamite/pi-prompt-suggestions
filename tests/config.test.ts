@@ -22,6 +22,7 @@ describe("configuration helpers", () => {
 			display: "ghost",
 			maxChars: 80,
 			maxTokens: 256,
+			model: "openai-codex/gpt-5.6-terra",
 		});
 	});
 

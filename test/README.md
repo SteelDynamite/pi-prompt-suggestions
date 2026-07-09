@@ -9,15 +9,7 @@ pi
 
 Pi auto-discovers `.pi/extensions/next-prompt-suggestion.ts` and enables debug notifications for model-generated suggestions.
 
-This test project also includes `.pi/prompt-suggestions.json`. It defaults to ghost display and enables `acceptTab` for testing. Set `display` to `belowEditor` to test the fallback widget mode.
-
-Add a `model` field there to test a dedicated suggestion model:
-
-```json
-{
-  "model": "openai/gpt-5-mini"
-}
-```
+This test project also includes `.pi/prompt-suggestions.json`. It uses `openai-codex/gpt-5.6-terra` for suggestions, defaults to ghost display, and enables `acceptTab` for testing. Set `display` to `belowEditor` to test the fallback widget mode.
 
 To test model generation, send a normal prompt with an obvious next step. After the agent finishes, a suggestion should appear as dim ghost text in the editor.
 
