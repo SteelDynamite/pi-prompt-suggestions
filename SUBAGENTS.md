@@ -1,5 +1,5 @@
 ---
-description: Maintains the pi-prompt-suggestions next-prompt suggestion extension
+description: Route here post-agent-turn prompt generation, strict model-output sanitation, ghost/below-editor rendering and empty-editor key acceptance, layered config and model fallback, and non-TUI, autocomplete, and custom-editor boundaries
 manifest: true
 resumable: true
 ---
